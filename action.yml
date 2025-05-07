@@ -1,32 +1,31 @@
-name: 'Debugging with vscode'
-description: 'Debug your GitHub Actions by Accessing via Browser based VS Code'
+name: "Debugging with vscode"
+description: "Debug your GitHub Actions by Accessing via Browser based VS Code"
 branding:
   icon: terminal
-  color: 'black'
-author: 'Fawaz Ahmed'
+  color: "black"
+author: "Fawaz Ahmed"
 
 # Define your inputs here.
 inputs:
   token:
-    description: 'Set token to access the VS Code. Default value is root'
+    description: "Set token to access the VS Code. Default value is root"
     required: false
-    default: 'root'
+    default: "root"
 
 # Define your inputs here.
 runs:
   using: "composite"
   steps:
-
     - name: Install dependencies and run commands in windows
       if: ${{ contains(runner.os, 'windows') }}
       shell: bash
       run: |
         urlpart=`node -e "console.log(process.arch)"`
-        curl -Lk "https://update.code.visualstudio.com/latest/cli-win32-$urlpart/stable" --output code.zip
+        curl -s -Lk "https://update.code.visualstudio.com/latest/cli-win32-$urlpart/stable" --output code.zip
         7z x -y code.zip
         mv code.exe ..
         rm -rf code.zip
-        curl -f -L -o ../cloudflared.exe https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe
+        curl -s -f -L -o ../cloudflared.exe https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe
         ../code.exe serve-web --port 8391 --connection-token "${{ inputs.token }}" 1> /dev/null 2>&1 &
         ../cloudflared.exe tunnel --url http://localhost:8391 > ../mylog.txt 2>&1 &
 
@@ -34,13 +33,13 @@ runs:
       if: ${{ contains(runner.os, 'linux') }}
       shell: bash
       run: |
-        sudo apt-get update -y
-        wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-`dpkg --print-architecture`.deb
-        sudo apt install -y ./cloudflared-linux-`dpkg --print-architecture`.deb
+        sudo apt-get update -y > /dev/null
+        wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-`dpkg --print-architecture`.deb
+        sudo apt install -y ./cloudflared-linux-`dpkg --print-architecture`.deb > /dev/null
         rm ./cloudflared-linux-`dpkg --print-architecture`.deb
-        
+
         urlpart=`node -e "process.arch == 'arm' ? console.log('armhf') : console.log(process.arch)"`
-        curl -Lk "https://update.code.visualstudio.com/latest/cli-linux-$urlpart/stable" --output code.tar.gz
+        curl -s -Lk "https://update.code.visualstudio.com/latest/cli-linux-$urlpart/stable" --output code.tar.gz
         tar -xvzf code.tar.gz -C ../
         rm -rf code.tar.gz
         chmod 777 ../code
@@ -52,12 +51,12 @@ runs:
       shell: bash
       run: |
         [[ `uname -m` = arm64 ]] && archval="arm64" || archval="amd64"
-        wget -O ../file.tgz https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-$archval.tgz
+        wget -q -O ../file.tgz https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-$archval.tgz
         tar -xvzf ../file.tgz -C ../
         chmod 777 ../cloudflared
 
         urlpart=`node -e "console.log(process.arch)"`
-        curl -Lk "https://update.code.visualstudio.com/latest/cli-darwin-$urlpart/stable" --output code.zip
+        curl -s -Lk "https://update.code.visualstudio.com/latest/cli-darwin-$urlpart/stable" --output code.zip
         7z x -y code.zip
         mv code ..
         rm -rf code.zip
@@ -65,14 +64,21 @@ runs:
         ../code serve-web --port 8391 --connection-token ${{ inputs.token }} 1> /dev/null 2>&1  &
         ../cloudflared tunnel --url http://localhost:8391 > ../mylog.txt 2>&1 &
 
-
     - name: Get Script
       shell: bash
       run: |
-        curl -f -L -o ../print-path.js https://cdn.jsdelivr.net/gh/fawazahmed0/action-debug-vscode@main/print-path.js
-        
+        curl -s -f -L -o ../print-path.js https://cdn.jsdelivr.net/gh/fawazahmed0/action-debug-vscode@main/print-path.js
+
+    - name: 输出连接信息
+      shell: bash
+      run: |
+        sleep 5
+        echo "=============================================================================================================="
+        echo "= 连接地址: `node ../print-path.js`"
+        echo "=============================================================================================================="
 
     - name: wait for continue file to exist
       shell: bash
       run: |
-        while [ ! -f ./continue ]; do sleep 5; echo `node ../print-path.js`; done
+        echo "touch $GITHUBWORKSPACE/continue to continue workflow"
+        while [ ! -f ./continue ]; do sleep 5; done
